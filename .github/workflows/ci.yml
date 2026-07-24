@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  UV_PYTHON: "3.13"
+
+jobs:
+  lint-python:
+    name: lint-python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --extra dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --extra dev
+      - run: uv run mypy
+
+  unit-python:
+    name: unit-python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --extra test
+      - run: uv run pytest tests/python -v
+
+  build-native:
+    name: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset debug -DFORGE_BUILD_BINDINGS=OFF
+      - run: cmake --build --preset debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge_cpp_tests
+          path: build/debug/forge_cpp_tests
+          retention-days: 1
+
+  unit-native:
+    name: unit-native
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset debug -DFORGE_BUILD_BINDINGS=OFF
+      - run: cmake --build --preset debug
+      - run: ctest --preset debug
+
+  smoke:
+    name: smoke
+    needs: [lint-python, typecheck, unit-python, unit-native]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: bash scripts/smoke.sh
+
+  # --- Not yet enabled. Each job below is real CI work with a real prerequisite;
+  # turning it on before that prerequisite exists would be scope creep ahead of the
+  # critical path (§269, CLAUDE.md working agreement).
+
+  # property-smoke:
+  #   TODO: enable once forge.domain and forge.planner have real state machines and
+  #   partition logic to generate a bounded corpus against (§268 Gate A —
+  #   Deterministic reference; §258 property-smoke: "bounded state-machine and
+  #   generated corpus").
+
+  # sanitizers:
+  #   TODO: enable once forge_cpp has real parsing/aggregation code worth sanitizing,
+  #   not just the Week 1 scaffold add() function (§268 Gate D — Measured native
+  #   acceleration, which explicitly requires "sanitizer coverage"; the asan/ubsan
+  #   CMake presets already exist for this — see CMakePresets.json).
+
+  # integration:
+  #   TODO(integration-embedded): enable once forge.coordinator and forge.worker can
+  #   run a real embedded-local multiprocess fixture (§268 Gate B — Durable local
+  #   execution).
+  #   TODO(integration-unix): enable once forge.protocol/forge.transport support a
+  #   socket-connected coordinator and independently launched workers (§268 Gate C —
+  #   Protocol-connected runtime).

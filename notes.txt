@@ -1,0 +1,219 @@
+Forge — Project Notes
+
+Working notes from the analysis of Forge_Master_Build_Specification.docx (v1.0, 2026-07-22). Covers: what the spec contains, an assessment of it, the work breakdown, tooling and reading, how to use Claude Code on it, and where to stop for resume purposes.
+
+1. What the document is
+
+A ~64,000-word, 434-section master build specification: 17 Parts plus Appendices A–M. It is specification only — no code exists yet.
+
+The spec is simultaneously a PRD, an execution-semantics contract, an architecture document, an implementation playbook, a fault-recovery design, a verification plan, a benchmark protocol, a 20-week project plan, and a portfolio-release checklist. It's explicitly framed as a portfolio project targeting an HRT Summer 2027 SWE internship, with a stated truthfulness rule: nothing goes on a resume until a tagged repo and reproducible evidence support the exact wording.
+
+The system
+
+A local-first, deterministic event-replay and compute engine. A client registers an immutable fixed-record dataset and an experiment. A coordinator deterministically partitions it into tasks, leases them to process-isolated workers, accepts attempt-scoped staged outputs, and conditionally commits exactly one visible result per task. Workers may crash or double-execute; committed results remain unambiguous.
+
+Load-bearing design decisions
+Decision	Why it matters
+At-least-once execution, exactly-once visible commit	Physical re-execution is allowed; the guarantee is about result visibility only
+Leases + fencing epochs	Stale workers cannot overwrite committed state after lease expiry
+SQLite as durable coordination truth	No correctness guarantee may depend on in-memory state
+Attempt-scoped staging + atomic publication	Write temp → fsync → rename; partial artifacts never become visible
+Control plane separated from data plane	Scheduler messages stay small and inspectable
+Framed binary protocol over UDS/TCP	Incremental decoder, bounded write queues, version negotiation, defensive limits
+Narrow C++20 pybind11 accelerator	Accepted only if measurement justifies it — explicitly not assumed to be faster
+Structure
+Parts I–II — product definition, acceptance contract, execution semantics, invariants
+Parts III–VIII — architecture, coordinator, worker runtime, storage formats, protocol, C++ boundary
+Parts IX–XVI — scheduling, fault tolerance, SDK/CLI, observability, security, verification, benchmarking, build/CI/release
+Part XVII — 20-week roadmap, milestone gates, backlog, risk control
+Appendices A–M — code skeletons, SQL, protocol pseudocode, test and benchmark schemas, runbooks, checklists, references
+2. Assessment
+Strengths
+
+Unusually strong on the things portfolio projects normally get wrong: precise vocabulary, explicit non-goals, scope-control rules, a truthfulness rule about resume claims, and a mandate to publish negative results. §4 (non-goals), §13 (scope control), and §269 (critical path) are the most valuable pages in the document. Reread them whenever tempted to add something.
+
+Risks
+
+Proportion. ~300–400 hours of planned work for a system whose spec is likely 10× the size of its eventual code. Gates 0–B (weeks 1–8) are realistic. Gates D–F assume no debugging surprises in C++ interop, crash-matrix flakiness, or benchmark methodology — all of which reliably eat weeks.
+
+Spec drift. v1.1 is scheduled for after Gate A, which is correct. But if the document stops matching the code it becomes a liability in an interview rather than an asset.
+
+Naming collision — fix in v1.1. The document uses "Gate A/B/C" twice with different meanings: §10 (release gates) and §268 (milestone gates, week-anchored). These are not the same gates. Everything below uses the §268 week-anchored numbering.
+
+3. Work breakdown
+Phase 0 — Contract freeze (Gate 0, weeks 1–2)
+Repo skeleton per §251; LICENSE, SECURITY.md, CONTRIBUTING.md, issue templates
+pyproject.toml (PEP 517), CMakeLists.txt, CMakePresets.json, lockfile, pre-commit
+One-command smoke test: import Python package, build trivial native extension, run one test per language
+Glossary (§427) and invariant list (§31) as living docs
+ADR-0001 (local-first deployment), ADR-0002 (at-least-once / exactly-once visible publication)
+Run, task, attempt, lease, worker state machines as tables — before the DB schema
+Phase 1 — Deterministic reference (Gate A, weeks 3–4)
+Fixed-record event format: file header, dataset manifest, partition index, boundary validation
+Deterministic synthetic dataset generator (seeded, byte-reproducible)
+Reference reader + deterministic contiguous partitioner
+Kernel contract and registry; two or three reference kernels
+Single-process engine: plan → execute → deterministic merge → run manifest + digests
+Differential fixture corpus; two identical runs must normalize to the same digest
+Phase 2 — Durable local execution (Gate B, weeks 5–8) — the heart of the project
+SQLite schema, constraints, WAL/transaction/connection policy (§64, §370)
+Repository interface + transactional implementation (Appendix G, §386)
+Coordinator: submission, idempotent run creation, planning transaction, worker registry, pull-based scheduler
+Worker runtime: child process model, spawn, fd hygiene, signal handling, timeout escalation (TERM → KILL), rlimits, bounded local cache
+Leases, heartbeats, lease expiry, fencing epochs, retry classification (retriable vs terminal)
+Attempt-scoped output staging + conditional commit transaction (§367)
+Cancellation semantics and administrative controls
+Coordinator restart + recovery reconciliation matrix (§66)
+Integration tests: kill worker mid-task, restart coordinator, land duplicate completion, expire lease — each with a deterministic asserted outcome
+Phase 3 — Protocol-connected runtime (Gate C, weeks 9–11)
+Frame header, message registry, protocol limits
+Incremental decoder state machine (NEED_FIXED_HEADER → …) surviving fragmentation and coalescing
+Encoder + bounded async writer with backpressure
+Asyncio UDS server and worker client; TCP as a variant
+Handshake and version negotiation; heartbeat/timeout separation
+Fuzzing and property tests; malformed/oversized/truncated frames must fail safely
+Open decision: §106 leaves the payload codec open. Start canonical JSON, measure, then decide on MessagePack. Pickle is prohibited.
+Phase 4 — Measured native acceleration (Gate D, weeks 12–14)
+Profile the Python path first and record it — reader, decode, kernel, merge, serialization, coordinator, idle
+ADR selecting the native boundary, with rejected alternatives
+C++20 core: checked little-endian decoder, event/result types, aggregation structure
+pybind11 batch API: buffer protocol, ownership, GIL release policy, exception translation
+CMake + scikit-build-core packaging; reproducible wheel build
+GoogleTest/Catch2, ASan + UBSan, differential tests against the Python oracle
+Crossover study: at what batch size does native win, and where does boundary overhead dominate?
+Phase 5 — Failure and performance study (Gate E, weeks 15–17)
+Structured log schema, metric taxonomy, run timeline, health endpoints, diagnostic bundle
+Fault injector + crash-point catalog; automated crash matrix; chaos scenarios; soak tests
+Freeze workload manifests and environment capture before running anything publishable
+Scaling study, partition-size study, serialization study, recovery-latency study
+Raw JSON/CSV evidence + analysis scripts regenerating every table and chart from one command
+Document at least one negative or neutral optimization result
+Phase 6 — Public release (Gate F, weeks 18–20)
+Docs: architecture, semantics, ADR index, benchmarks, limitations, postmortems
+README reproducing one successful run and one recovery scenario from a clean checkout
+Security pass: no secrets, no unsafe deserialization, path-traversal checks, resource-exhaustion defenses
+Clean-machine rehearsal; tagged release; evidence bundle
+Claim-by-claim resume audit; interview narrative (hard bug, semantic tradeoff, performance surprise, scope decision)
+Cross-cutting, every week
+
+Failing test first. ADR while context is fresh. main stays green. Capture evidence as you go — the spec treats evidence as a deliverable, not documentation debt.
+
+4. Libraries and tooling
+
+Python standard library (the real substance): asyncio, multiprocessing (spawn semantics), multiprocessing.shared_memory, sqlite3, mmap, signal, struct, hashlib, resource, os (fd inheritance, rename, fsync), contextvars, dataclasses/enum, pathlib.
+
+Python third-party: pydantic or attrs, Typer or Click, pytest + pytest-asyncio, Hypothesis, mypy or pyright, Ruff, uv (or Poetry), coverage.py, msgpack (deferred), py-spy / cProfile / memray or Scalene, pandas + matplotlib.
+
+C++ / build: C++20 toolchain (GCC 12+ / Clang 15+), CMake ≥ 3.24 with presets, pybind11, scikit-build-core, GoogleTest or Catch2, Google Benchmark, ASan, UBSan, libFuzzer.
+
+Systems tooling: perf, strace, lsof, ss, SQLite CLI, GitHub Actions.
+
+5. Required reading
+Cited in the spec (Appendix M)
+Python docs — asyncio, multiprocessing, shared_memory, sqlite3, mmap, signal, struct, hashlib, resource
+SQLite — docs, and specifically WAL mode, transactions, online backup API
+Linux man-pages — epoll(7), unix(7), socket(7), mmap(2), fsync(2), rename(2), signal(7), proc(5)
+C++/build — cppreference, pybind11, CMake, scikit-build-core, GoogleTest, ASan, UBSan, libFuzzer
+Testing/measurement — pytest, Hypothesis, Ruff, mypy, Python Packaging User Guide, Linux perf, Google Benchmark
+Concepts the spec names (§434)
+
+Leases and fencing, idempotency, transaction isolation, write-ahead logging, crash consistency, process supervision, stream framing, flow control, deterministic replay, property-based and model-based testing, queueing and parallel scaling, profiling, experimental design.
+
+Additions, in priority order for this design
+Kleppmann, Designing Data-Intensive Applications, ch. 8–9 — the fencing-token argument is the single most relevant thing for the commit protocol
+Burrows, The Chubby Lock Service (OSDI '06) — origin of lease + fencing thinking
+Dean & Ghemawat, MapReduce — deterministic partitioning plus re-execution as the fault-tolerance story; Forge is structurally close
+Pillai et al., All File Systems Are Not Created Equal (OSDI '14) — why atomic rename + fsync ordering is subtler than it looks. Pair with Dan Luu's "Files are hard"
+Hypothesis stateful/rule-based testing docs — needed for the §208 state-machine property tests
+Gregg, Systems Performance — at minimum the USE method and profiling chapter, before Gate E
+McSherry et al., Scalability! But at what COST? — a corrective before publishing scaling numbers
+
+Sequencing note: do the leases/fencing and crash-consistency reading before week 5, not during. Those two topics determine the SQLite schema, and §269 is right that a schema built on vague semantics is expensive to repair.
+
+6. Accelerating with Claude Code
+
+Realistic compression: 20 weeks → 13–15 weeks, not 20 → 6.
+
+Where it genuinely compresses
+Area	Saving	Notes
+Week 1 scaffold	~1 week → 1–2 days	Fully specified target, pure mechanical setup
+Test infrastructure	~2 weeks total	The plumbing, not the test cases: fixtures, deterministic clock, fault-injector scaffolding, crash-matrix runner
+C++ build friction	~1 week	CMake + scikit-build-core + pybind11 + sanitizers teaches nothing and eats days
+Benchmark analysis	~4 days	Once the raw record schema is frozen, the raw-JSON → tables/charts pipeline is mechanical
+Documentation (weeks 18–19)	~50%	Docstrings, docs site, API reference — not the architecture narrative or limitations page
+Debugging	Unquantifiable but real	Race conditions in the lease/commit path are where time actually goes
+Where it doesn't
+
+The critical path (§269) is a dependency chain of understanding, not typing. Weeks 2, 12, and 17 are thinking weeks — freezing semantics, choosing the native boundary from profile evidence, designing benchmark methodology. This is Amdahl's law applied to your own project: accelerating the parallel fraction doesn't help when the serial fraction is comprehension.
+
+The conditional commit transaction, lease expiry with fencing epochs, and the recovery reconciliation matrix are the project. ~400 lines out of the whole repo, and the 400 lines an interviewer will pull on. If you can't re-derive on a whiteboard why a fencing epoch is checked inside the same transaction as the commit — and what breaks if it isn't — the project inverts from asset to liability.
+
+The guard is already in the spec: §270 ends each week with "explain the design aloud," and every week section has review questions. Those become more important with AI assistance, not less. Concrete test: after each gate, close the laptop and re-derive the core mechanism on paper.
+
+ADRs stay hand-written. They're the durable record of your judgment and what makes the interview conversation good.
+
+Setup
+
+Split the spec into docs/spec/part-XX.md files rather than feeding a 64k-word blob. Write a CLAUDE.md holding only load-bearing constraints: glossary (§427), invariants (§31), non-goals (§4), scope-control rules (§13), and an index of which spec file covers what.
+
+Put the scope-control rules in CLAUDE.md verbatim — best defense against the failure mode where an agent helpfully adds speculative execution before leases are correct.
+
+Highest-value use is adversarial review, not generation. Paste the commit transaction and ask for the interleaving that breaks it. Ask what happens if the coordinator dies between the artifact rename and the database commit. Ask it to argue the fencing check is in the wrong place. This builds understanding rather than substituting for it, and it's the closest thing a solo project has to code review.
+
+Also: plan mode for design conversations before implementation; at Gate E, have it generate hostile interview questions from your own docs and grade answers against the §271–290 review questions.
+
+7. Where to ship
+
+Gate B is the floor. Gate C is the target.
+
+Gate A (week 4) — not enough
+
+A single-process deterministic batch job. Necessary as the oracle for everything after it, but the honest bullet is "built a deterministic data-processing pipeline with reproducible output verification." True and unremarkable. Nothing in it shows distributed-systems reasoning.
+
+Gate B (week 8) — the floor
+
+First point where the project stops resembling a multiprocessing tutorial. Durable coordinator, lease-based assignment with fencing, at-least-once execution with exactly-once visible commit, crash recovery a script can demonstrate.
+
+Built a durable task coordinator with SQLite-backed state, lease-based assignment with fencing epochs, and a conditional commit protocol providing exactly-once visible results under at-least-once execution.
+
+Automated crash tests demonstrating that worker kill, lease expiry, duplicate completion, and coordinator restart each produce deterministic, non-ambiguous committed state.
+
+Keep the "visible" qualifier. The truthfulness rule requires it, and an interviewer who notices you kept it will think better of you than one who catches you dropping it.
+
+Gate C (week 11) — the target
+
+Adds the framed protocol, which is where the "systems fundamentals — memory, I/O, process management" signal actually lands. Also a coherent stopping point: the system is complete and explainable without C++.
+
+Implemented a framed binary protocol over Unix-domain sockets with an incremental decoder state machine, bounded write queues with backpressure, and version negotiation; property- and fuzz-tested against fragmentation, coalescing, truncation, and oversized frames.
+
+Gate D (week 14) — conditional
+
+Matters if you want to be read as a C++ candidate rather than a Python one. Highest-variance gate — pybind11, CMake, sanitizers, and a defensible crossover measurement is a lot for three weeks. Its bullet is only strong if the measurement is honest about where native loses.
+
+The part people skip
+
+Whatever gate you stop at, you still owe a slice of Gate F: a README that reproduces one successful run and one recovery scenario from a clean checkout, a clean-machine rehearsal, a limitations page, and a security pass. Three to five days. It's the difference between a portfolio project and code on GitHub. Gate B plus that polish beats Gate D with a README nobody can follow.
+
+Build the resume claim map incrementally — at each gate, write the bullets that gate supports and check each against a command you can actually run. Gate F work in ten-minute increments.
+
+Timing constraint
+
+As of late July 2026, twenty weeks puts Gate F in mid-December. Quant/HFT firms recruit early and a Summer 2027 class may be substantially filled before the project is "done." Gate B lands ~late September; Gate C ~mid-to-late October — much safer dates to have a shippable repo.
+
+Likely plan: ship Gate C with release polish in October, apply, keep building D–F publicly. A repo with visible ongoing commits is a talking point, not a weakness.
+
+⚠️ Unverified. The recruiting-timeline claim above is a general observation about the industry, not a checked fact about HRT's Summer 2027 application dates. Confirm against HRT's student-opportunities page before planning around it.
+
+8. Open decisions and to-dos
+Item	Where	Status
+Payload codec choice	§106	Open — start JSON, measure, decide on MessagePack. Pickle prohibited
+Gate A/B/C naming collision	§10 vs §268	Fix in doc v1.1
+Second metadata backend	§13	Deferred by scope rule — do not start
+Multi-host mode	§148	Optional, blocked on reliable single-host restart recovery
+Shared-memory ring	§115	Optional, blocked on measurement showing serialization is the limit
+Speculative execution	§146	Blocked on leases/fencing/commit being correct
+ADR-0001, ADR-0002	§271	Week 1 must-have — write by hand
+HRT application dates	—	Verify before finalizing the ship date
+9. The one-line version
+
+Freeze semantics before schema. Build the single-process oracle before multiprocessing. Persist before retrying. Stage before recovering. Measure before optimizing in C++. Automate failure before publishing performance. Ship Gate C in October and keep going in public.

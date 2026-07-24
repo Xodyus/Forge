@@ -1,0 +1,56 @@
+# Build artifacts
+/build/
+/build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.pyd
+*.exe
+compile_commands.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+wheels/
+*.whl
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Generated datasets and run output
+/datasets/generated/
+/runs/
+*.forge-run/
+
+# Benchmarks: curated reports may be committed, raw trial output must not be
+/benchmarks/raw/*
+!/benchmarks/raw/.gitkeep
+
+# Profiling output
+*.prof
+*.svg.profile
+perf.data*
+*.heap
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

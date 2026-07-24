@@ -1,0 +1,137 @@
+[build-system]
+# pybind11 is listed here (not just in the "native" extra) so scikit-build-core can
+# add its CMake config directory to CMAKE_PREFIX_PATH during the wheel build; the
+# root CMakeLists.txt falls back to FetchContent when it is not found that way
+# (cmake/Dependencies.cmake), so a plain `cmake --preset` build stays self-sufficient.
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "forge"
+version = "0.1.0.dev0"
+description = "A deterministic, local-first event-replay and compute engine."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Lucas Cochran" }]
+# Lower bound 3.11: match statements, exception groups backport availability, and
+# tomllib are assumed by later tooling choices. Upper bound <3.14: pinned below the
+# newest CPython release so pybind11/scikit-build-core and sanitizer toolchains have
+# had time to catch up before Forge adopts it; revisit once Gate A is green (§253).
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "typer>=0.12,<1",
+  "pydantic>=2.7,<3",
+]
+
+[project.optional-dependencies]
+# Separated per §253: runtime deps above stay minimal; everything else is opt-in.
+test = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "hypothesis>=6.100",
+  "coverage[toml]>=7.5",
+]
+dev = [
+  "mypy>=1.10",
+  "ruff>=0.5",
+  "pre-commit>=3.7",
+]
+bench = [
+  "pandas>=2.2",
+  "matplotlib>=3.8",
+  "py-spy>=0.3.14",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+]
+# Build-time tooling for contributors driving cpp/ directly instead of through pip
+# (§254). Not required for `pip install forge`; scikit-build-core brings its own.
+native = [
+  "pybind11>=2.13",
+  "cmake>=3.26",
+  "ninja>=1.11",
+]
+
+[project.scripts]
+# Week 1 scaffold stubs (§271 item 5): each exits with "not implemented" until the
+# corresponding component is built.
+forge = "forge.cli.__main__:main"
+forge-coordinator = "forge.coordinator.__main__:main"
+forge-worker = "forge.worker.__main__:main"
+
+[tool.scikit-build]
+minimum-version = "0.10"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["forge"]
+
+[tool.scikit-build.cmake.define]
+FORGE_BUILD_BINDINGS = "ON"
+# Wheel builds skip GoogleTest/Benchmark entirely (§254 targets are for the
+# cmake --preset dev loop and CI's build-native/unit-native jobs, not for `pip
+# install`); a contributor's toolchain quirks should not break installing Forge.
+FORGE_BUILD_TESTS = "OFF"
+FORGE_BUILD_BENCH = "OFF"
+# Warnings-as-errors is enforced by the debug/release/asan/ubsan CMake presets and
+# CI, not by end-user `pip install` — an unfamiliar compiler warning should not break
+# someone's install.
+FORGE_WARNINGS_AS_ERRORS = "OFF"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["forge"]
+exclude = "^build/"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["forge", "tests/python"]
+extend-exclude = ["build", "cpp"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "TID", "SIM", "N"]
+
+# Partial enforcement of the §40 dependency direction: Ruff's banned-api rule is a
+# single global list with one rule code (TID251), so it cannot express "coordinator
+# may import metadata but api may not" on its own. What it *can* express is the one
+# rule the spec states unconditionally: forge.domain and forge.planner are pure core
+# and must import none of the edges below. Every other package has TID251 turned back
+# off in per-file-ignores because it legitimately needs some subset of these imports
+# and Ruff cannot scope the ban to "everyone except this one edge". Enforcing the full
+# graph (e.g. worker may import protocol but not coordinator) needs a tool like
+# import-linter; deliberately not added here since the instruction asked for Ruff.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"forge.api" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.api (§40)." }
+"forge.cli" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.cli (§40)." }
+"forge.coordinator" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.coordinator (§40)." }
+"forge.metadata" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.metadata (§40)." }
+"forge.artifacts" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.artifacts (§40)." }
+"forge.protocol" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.protocol (§40)." }
+"forge.transport" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.transport (§40)." }
+"forge.worker" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.worker (§40)." }
+"forge.bench" = { msg = "forge.domain/forge.planner are pure core and must not depend on forge.bench (§40)." }
+"forge_cpp" = { msg = "forge.domain/forge.planner are pure Python core and must not depend on the native extension (§40, §41)." }
+
+[tool.ruff.lint.per-file-ignores]
+"forge/api/**" = ["TID251"]
+"forge/cli/**" = ["TID251"]
+"forge/coordinator/**" = ["TID251"]
+"forge/metadata/**" = ["TID251"]
+"forge/artifacts/**" = ["TID251"]
+"forge/protocol/**" = ["TID251"]
+"forge/transport/**" = ["TID251"]
+"forge/worker/**" = ["TID251"]
+"forge/kernels/**" = ["TID251"]
+"forge/datasets/**" = ["TID251"]
+"forge/observability/**" = ["TID251"]
+"forge/bench/**" = ["TID251"]
+"forge/testing/**" = ["TID251"]
+"tests/**" = ["TID251"]
+"examples/**" = ["TID251"]
+
+[tool.ruff.format]
+quote-style = "double"

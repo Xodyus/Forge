@@ -1,0 +1,31 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict, forge/)
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^forge/
+
+      - id: no-raw-benchmarks
+        name: block committing benchmarks/raw/
+        entry: python scripts/check_no_raw_benchmarks.py
+        language: system
+        pass_filenames: true
