@@ -1,0 +1,30 @@
+site_name: Forge
+site_description: A deterministic, local-first event-replay and compute engine.
+repo_url: https://github.com/Xodyus/Forge
+repo_name: Xodyus/Forge
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+
+nav:
+  - Home: index.md
+  - Specification index: spec/INDEX.md
+  - Architecture: architecture/README.md
+  - Glossary: semantics/glossary.md
+  - Architecture decision records:
+      - Template: adr/0000-template.md
+      - "ADR-0001: Local-first deployment": adr/0001-local-first-deployment.md
+      - "ADR-0002: At-least-once execution / exactly-once visible commit": adr/0002-at-least-once-execution-exactly-once-visible-commit.md
+
+plugins:
+  - search
+  - htmlproofer:
+      enabled: true
+      validate_external_urls: false
+
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true

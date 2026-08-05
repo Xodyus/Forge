@@ -1,0 +1,22 @@
+{
+  "name": "forge",
+  "image": "mcr.microsoft.com/devcontainers/cpp:1-ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.13"
+    }
+  },
+  "onCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh",
+  "postCreateCommand": "$HOME/.local/bin/uv sync --extra test --extra dev && $HOME/.local/bin/uv run pre-commit install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

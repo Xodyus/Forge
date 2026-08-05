@@ -44,6 +44,7 @@ bench = [
 docs = [
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
+  "mkdocs-htmlproofer-plugin>=1.2",
 ]
 # Build-time tooling for contributors driving cpp/ directly instead of through pip
 # (§254). Not required for `pip install forge`; scikit-build-core brings its own.

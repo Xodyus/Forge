@@ -13,13 +13,32 @@ rules that bind every change.
 
 ## Workflow (§252)
 
-- Keep `main` buildable and tested. Use short-lived feature branches and small,
+- Keep `master` buildable and tested. Use short-lived feature branches and small,
   reviewable pull requests.
 - Every pull request names the requirement IDs, invariants, tests, and benchmark
   impact it touches, where relevant.
 - Use consistent commit messages that explain intent, not only what changed.
 - Tests before implementation. No feature may be added ahead of its position in the
   critical path (§269).
+
+## Branch protection expectations (§271)
+
+These are the rules `master` should be protected under once CI is green enough to
+enforce them (§252: "Keep main buildable and tested"). Solo project, so this is
+mostly self-discipline until/unless it's turned into a live GitHub branch protection
+rule:
+
+- No direct pushes of implementation changes to `master` — use a feature branch and a
+  pull request, even solo, so the PR template's spec/invariant/test checklist gets
+  filled in and there is a reviewable diff in the history.
+- Required status checks before merge, once each exists and is reliably green:
+  `lint-python`, `typecheck`, `unit-python`, `build-native`, `unit-native`, `smoke`
+  (§258; see `.github/workflows/ci.yml`).
+- Do not force-push or rewrite history on `master`. Tags for Gate A/B/benchmark
+  baselines/public release are never rewritten once pushed (§252).
+- A pull request that touches `cpp/` should not merge with `unit-native` failing, even
+  though sanitizer jobs are not enabled yet (see the commented CI stubs and their gate
+  TODOs).
 
 ## Local setup
 

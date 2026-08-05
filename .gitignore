@@ -1,6 +1,7 @@
 # Build artifacts
 /build/
 /build-*/
+/site/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt

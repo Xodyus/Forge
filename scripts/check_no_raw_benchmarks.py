@@ -21,7 +21,7 @@ def main(argv: list[str]) -> int:
             offending.append(arg)
 
     if offending:
-        print("Refusing to commit raw benchmark output (§252, benchmarks/raw/ is git-ignored evidence, not source):")
+        print("Refusing to commit raw benchmark output (§252, benchmarks/raw/ is git-ignored):")
         for path in offending:
             print(f"  {path}")
         return 1

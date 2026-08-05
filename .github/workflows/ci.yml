@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 env:
@@ -71,6 +71,15 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: bash scripts/smoke.sh
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --extra docs
+      - run: uv run mkdocs build --strict
 
   # --- Not yet enabled. Each job below is real CI work with a real prerequisite;
   # turning it on before that prerequisite exists would be scope creep ahead of the

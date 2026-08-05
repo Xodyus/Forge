@@ -3,8 +3,8 @@
 Source: `Forge_Master_Build_Specification.docx` (v1.0, 2026-07-22), converted with pandoc
 and split by Part/Appendix. All 434 numbered sections (§1–§434) are covered, contiguous,
 and non-overlapping across the files below. Section numbers are global across the whole
-document, not reset per Part. Figures referenced by section text live in
-[media/](media/).
+document, not reset per Part. Figures referenced by section text live in the `media/`
+subdirectory alongside these files.
 
 **Consult this table before implementing any component.** Read the relevant Part file
 in full before writing code against it — do not implement from memory or from this
