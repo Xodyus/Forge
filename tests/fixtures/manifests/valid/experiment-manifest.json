@@ -1,0 +1,39 @@
+{
+  "schema": "forge.experiment-manifest",
+  "schema_version": 1,
+  "experiment_id": "instrument-stats-example",
+  "dataset": {
+    "dataset_id": "synthetic-orders-v1-seed-17",
+    "content_sha256": "f0005b03012eca40beea516098c28710e754f2b847b7adf02fb6286de272fce2"
+  },
+  "partitioning": {
+    "policy": "contiguous-record-ranges",
+    "policy_version": 1,
+    "target_records_per_task": 250000
+  },
+  "kernel": {
+    "kernel_id": "forge.instrument-stats",
+    "kernel_version": "1.0.0",
+    "engine": "python",
+    "parameter_schema_version": 1,
+    "parameters": {
+      "include_event_types": [
+        1,
+        2,
+        3
+      ]
+    }
+  },
+  "execution": {
+    "max_attempts_per_task": 3,
+    "attempt_timeout_seconds": 120,
+    "lease_seconds": 30,
+    "heartbeat_seconds": 5,
+    "max_parallel_tasks": 8
+  },
+  "result": {
+    "schema_id": "forge.instrument-stats-result",
+    "schema_version": 1,
+    "canonical_merge": "instrument-id-ascending"
+  }
+}

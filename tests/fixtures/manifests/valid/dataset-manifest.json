@@ -1,0 +1,38 @@
+{
+  "schema": "forge.dataset-manifest",
+  "schema_version": 1,
+  "dataset_id": "synthetic-orders-v1-seed-17",
+  "created_by": {
+    "generator_id": "forge.synthetic-events",
+    "generator_version": "1.0.0",
+    "seed": 17
+  },
+  "record_schema": {
+    "id": "forge.event.fixed32",
+    "version": 1,
+    "record_bytes": 32,
+    "byte_order": "little"
+  },
+  "files": [
+    {
+      "relative_path": "data/events-00000.forge",
+      "byte_count": 32000128,
+      "record_count": 1000000,
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "payload_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "generation": {
+    "timestamp_start_ns": 0,
+    "timestamp_step_distribution": "uniform:1..1000",
+    "instrument_count": 128,
+    "event_type_weights": {
+      "1": 0.6,
+      "2": 0.25,
+      "3": 0.15
+    },
+    "value_distribution": "normal:mean=0,stddev=100000",
+    "quantity_distribution": "lognormal:parameters=frozen"
+  },
+  "content_sha256": "f0005b03012eca40beea516098c28710e754f2b847b7adf02fb6286de272fce2"
+}
