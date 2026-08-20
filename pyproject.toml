@@ -83,6 +83,10 @@ python_version = "3.11"
 strict = true
 files = ["forge"]
 exclude = "^build/"
+# Without this, mypy falls back to a generic BaseModel.__init__ and can't check
+# constructor keywords against actual field names (e.g. Field(alias=...) with
+# populate_by_name=True) — it either misses real typos or flags valid calls.
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]

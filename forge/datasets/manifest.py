@@ -123,10 +123,18 @@ class _FilesOnly(_StrictModel):
     files: list[DatasetFileEntry]
 
 
+def compute_content_sha256(files: list[DatasetFileEntry]) -> str:
+    """The same digest `DatasetManifest._check_content_digest` verifies — exposed so
+    a writer (:mod:`forge.datasets.generator`) can compute `content_sha256` before
+    constructing the manifest, instead of guessing and letting validation fail."""
+    return content_digest(_FilesOnly(files=files)).hex_value
+
+
 __all__ = [
     "DatasetFileEntry",
     "DatasetGeneratorInfo",
     "DatasetManifest",
     "DatasetRecordSchema",
     "canonical_json_bytes",
+    "compute_content_sha256",
 ]

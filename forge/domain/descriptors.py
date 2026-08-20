@@ -24,7 +24,14 @@ from forge.domain.identifiers import (
 
 @dataclass(frozen=True, slots=True)
 class PartitionDescriptor:
-    """A deterministic logical slice of a dataset (§19 Table 11)."""
+    """A deterministic logical slice of a dataset (§19 Table 11).
+
+    ``partition_seed`` is a *run*-level value — §19 defines it as "computed from run
+    seed and partition identity" — so it is ``None`` for the dataset-only partition
+    index :func:`forge.datasets.partitioning.plan_dataset_partitions` produces (Week
+    3), and only gets filled in once a run/experiment seed exists to derive it from
+    (``forge.planner``, Week 4).
+    """
 
     dataset_id: DatasetId
     partition_id: PartitionId
@@ -32,7 +39,7 @@ class PartitionDescriptor:
     file_id: str
     record_start: int
     record_count: int
-    partition_seed: int
+    partition_seed: int | None = None
     byte_start: int | None = None
     byte_length: int | None = None
     expected_input_digest: Digest | None = None
