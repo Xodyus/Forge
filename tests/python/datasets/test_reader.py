@@ -89,3 +89,28 @@ def test_default_generated_magic_matches_constant(tmp_path: Path) -> None:
     path = _generate(tmp_path, 1)
     reader = DatasetFileReader.open(path)
     assert reader.header.magic == DATASET_MAGIC
+
+
+# --- read_records (partition slicing) ----------------------------------------
+
+
+def test_read_records_slice_matches_full_iteration(tmp_path: Path) -> None:
+    path = _generate(tmp_path, 100)
+    reader = DatasetFileReader.open(path)
+    full = list(reader.iter_records())
+    middle = list(reader.read_records(record_start=40, record_count=10))
+    assert middle == full[40:50]
+
+
+def test_read_records_rejects_out_of_range_slice(tmp_path: Path) -> None:
+    path = _generate(tmp_path, 10)
+    reader = DatasetFileReader.open(path)
+    with pytest.raises(DatasetIntegrityError, match="exceed"):
+        list(reader.read_records(record_start=5, record_count=10))
+
+
+def test_read_records_rejects_negative_arguments(tmp_path: Path) -> None:
+    path = _generate(tmp_path, 10)
+    reader = DatasetFileReader.open(path)
+    with pytest.raises(ValueError, match="non-negative"):
+        list(reader.read_records(record_start=-1, record_count=1))

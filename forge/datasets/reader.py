@@ -77,9 +77,31 @@ class DatasetFileReader:
             )
 
     def iter_records(self) -> Iterator[EventRecord]:
+        yield from self.read_records(record_start=0, record_count=self.header.record_count)
+
+    def read_records(self, *, record_start: int, record_count: int) -> Iterator[EventRecord]:
+        """Read a contiguous slice — e.g. one partition's records, by
+        `PartitionDescriptor.record_start`/`record_count` — without loading the
+        whole file. Takes plain ints rather than a `PartitionDescriptor` so this
+        module doesn't have to depend on `forge.domain` for a read path.
+
+        Validates the range eagerly (not lazily on first iteration) so a caller who
+        never consumes the returned iterator still finds out immediately that the
+        range was invalid, matching `open()`'s fail-fast behavior.
+        """
+        if record_start < 0 or record_count < 0:
+            raise ValueError("record_start and record_count must be non-negative")
+        if record_start + record_count > self.header.record_count:
+            raise DatasetIntegrityError(
+                f"{self.path}: requested records [{record_start}, {record_start + record_count}) "
+                f"exceed file record_count {self.header.record_count}"
+            )
+        return self._read_records(record_start, record_count)
+
+    def _read_records(self, record_start: int, record_count: int) -> Iterator[EventRecord]:
         with self.path.open("rb") as handle:
-            handle.seek(DATASET_HEADER_BYTES)
-            for index in range(self.header.record_count):
+            handle.seek(DATASET_HEADER_BYTES + record_start * EVENT_RECORD_BYTES)
+            for index in range(record_start, record_start + record_count):
                 chunk = handle.read(EVENT_RECORD_BYTES)
                 if len(chunk) != EVENT_RECORD_BYTES:
                     raise DatasetIntegrityError(
